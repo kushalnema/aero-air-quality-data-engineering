@@ -17,3 +17,5 @@ data/gold/
 
 .idea/
 .vscode/
+
+.streamlit/secrets.toml

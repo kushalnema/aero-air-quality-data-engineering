@@ -1,16 +1,5 @@
-import os
-
-import mysql.connector
-import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
-
-
-# ==================================================
-# CONFIGURATION
-# ==================================================
-
-load_dotenv()
+import pandas as pd
 
 
 st.set_page_config(
@@ -20,34 +9,23 @@ st.set_page_config(
 )
 
 
-# ==================================================
-# TITLE
-# ==================================================
-
 st.title("🌍 Indian Air Quality Dashboard")
+st.write("Air-quality station and measurement data loaded from TiDB Cloud.")
 
-st.write(
-    "Air-quality station and measurement data "
-    "loaded from MySQL."
+
+# --------------------------------------------------
+# TiDB Cloud connection
+# --------------------------------------------------
+
+conn = st.connection(
+    "tidb",
+    type="sql"
 )
 
 
-# ==================================================
-# MYSQL CONNECTION
-# ==================================================
-
-connection = mysql.connector.connect(
-    host=os.getenv("MYSQL_HOST", "localhost"),
-    port=int(os.getenv("MYSQL_PORT", "3306")),
-    user=os.getenv("MYSQL_USER"),
-    password=os.getenv("MYSQL_PASSWORD"),
-    database=os.getenv("MYSQL_DATABASE"),
-)
-
-
-# ==================================================
-# LOAD STATION DATA
-# ==================================================
+# --------------------------------------------------
+# Load station data
+# --------------------------------------------------
 
 station_query = """
 SELECT
@@ -60,15 +38,15 @@ SELECT
 FROM air_quality_locations
 """
 
-stations_df = pd.read_sql(
+stations_df = conn.query(
     station_query,
-    connection,
+    ttl=600
 )
 
 
-# ==================================================
-# LOAD MEASUREMENT DATA
-# ==================================================
+# --------------------------------------------------
+# Load measurement data
+# --------------------------------------------------
 
 measurement_query = """
 SELECT
@@ -87,22 +65,15 @@ FROM fact_air_quality_measurements
 ORDER BY measurement_time_utc DESC
 """
 
-measurements_df = pd.read_sql(
+measurements_df = conn.query(
     measurement_query,
-    connection,
+    ttl=600
 )
 
 
-# ==================================================
-# CLOSE MYSQL CONNECTION
-# ==================================================
-
-connection.close()
-
-
-# ==================================================
-# METRICS
-# ==================================================
+# --------------------------------------------------
+# Dashboard metrics
+# --------------------------------------------------
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -110,26 +81,25 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric(
         "Total Stations",
-        len(stations_df),
+        len(stations_df)
     )
 
 
 with col2:
     st.metric(
         "Locations",
-        stations_df["locality"].nunique(),
+        stations_df["locality"].nunique()
     )
 
 
 with col3:
     st.metric(
         "Countries",
-        stations_df["country_code"].nunique(),
+        stations_df["country_code"].nunique()
     )
 
 
 with col4:
-
     if not measurements_df.empty:
 
         latest_value = measurements_df.iloc[0][
@@ -142,20 +112,19 @@ with col4:
 
         st.metric(
             "Latest PM2.5",
-            f"{latest_value} {latest_unit}",
+            f"{latest_value} {latest_unit}"
         )
 
     else:
-
         st.metric(
             "Latest PM2.5",
-            "N/A",
+            "N/A"
         )
 
 
-# ==================================================
-# MEASUREMENTS
-# ==================================================
+# --------------------------------------------------
+# Measurements
+# --------------------------------------------------
 
 st.subheader("📊 Air Quality Measurements")
 
@@ -183,9 +152,9 @@ else:
     )
 
 
-# ==================================================
-# STATION DATA
-# ==================================================
+# --------------------------------------------------
+# Stations
+# --------------------------------------------------
 
 st.subheader("📍 Air Quality Stations")
 
@@ -195,17 +164,14 @@ st.dataframe(
 )
 
 
-# ==================================================
-# MAP
-# ==================================================
+# --------------------------------------------------
+# Map
+# --------------------------------------------------
 
 st.subheader("🗺️ Station Map")
 
 map_data = stations_df[
-    [
-        "latitude",
-        "longitude",
-    ]
+    ["latitude", "longitude"]
 ].dropna()
 
 st.map(map_data)
